@@ -2,7 +2,8 @@
 
 ## Hosted demo (Render)
 
-A public demo runs as a single Render web service built from the root
+A public demo runs at **https://controlplane-03g1.onrender.com** as a single
+Render web service built from the root
 [`Dockerfile`](../Dockerfile) and described by [`render.yaml`](../render.yaml).
 
 | Aspect | Demo deployment |

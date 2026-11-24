@@ -9,6 +9,12 @@ It runs **completely offline** with deterministic in-process providers, and
 switches to Azure OpenAI, Azure AI Search, Blob Storage and Azure Monitor by
 changing environment variables — no code changes.
 
+**Live demo:** [controlplane-03g1.onrender.com](https://controlplane-03g1.onrender.com) —
+sign in with `admin@contoso.com` / `Passw0rd!Demo`. It runs on Render's free tier
+in local provider mode: the first request after an idle period can take up to a
+minute, and the demo data resets whenever the instance restarts
+([details](docs/DEPLOYMENT.md#hosted-demo-render)).
+
 > **Status.** This is a working vertical slice, not a finished product. Read
 > [BUILD_REPORT.md](BUILD_REPORT.md) for exactly what was verified, what was
 > verified with mocks, and what still requires an Azure subscription. Nothing in
