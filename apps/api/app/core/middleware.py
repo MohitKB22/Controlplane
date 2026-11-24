@@ -77,12 +77,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """
 
     EXEMPT_PATHS = {"/health/live", "/health/ready", "/openapi.json", "/docs", "/redoc"}
+    EXEMPT_PREFIXES = ("/assets/",)  # static UI bundles when the API serves the web app
+    PRUNE_EVERY = 1000  # requests between sweeps of idle client windows
 
     def __init__(self, app, limit_per_minute: int | None = None):
         super().__init__(app)
         self.limit = limit_per_minute or settings.rate_limit_per_minute
         self._hits: dict[str, deque[float]] = defaultdict(deque)
         self._lock = Lock()
+        self._since_prune = 0
 
     def _client_key(self, request: Request) -> str:
         api_key = request.headers.get("x-api-key")
@@ -94,12 +97,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return f"ip:{request.client.host if request.client else 'unknown'}"
 
     async def dispatch(self, request: Request, call_next):
-        if request.url.path in self.EXEMPT_PATHS:
+        path = request.url.path
+        if path in self.EXEMPT_PATHS or path.startswith(self.EXEMPT_PREFIXES):
             return await call_next(request)
 
         key = self._client_key(request)
         now = time.time()
         with self._lock:
+            # Without pruning, every distinct client ever seen keeps a deque
+            # forever — unbounded memory growth on a long-lived public instance.
+            self._since_prune += 1
+            if self._since_prune >= self.PRUNE_EVERY:
+                self._since_prune = 0
+                for stale in [k for k, w in self._hits.items() if not w or now - w[-1] > 60]:
+                    del self._hits[stale]
             window = self._hits[key]
             while window and now - window[0] > 60:
                 window.popleft()

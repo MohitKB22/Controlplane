@@ -46,6 +46,14 @@ cd apps/web && npx playwright install --with-deps chromium && npm run e2e
 
 `E2E_NO_SERVER=1` skips starting the dev server if you already have one.
 
+To run the suite against the single-origin demo image instead of the dev
+server, point it at the container:
+
+```bash
+docker run --rm -p 8000:8000 -e SECRET_KEY="$(openssl rand -base64 48)" controlplane-demo
+cd apps/web && E2E_BASE_URL=http://localhost:8000 E2E_NO_SERVER=1 npm run e2e
+```
+
 ## What the integration tests actually prove
 
 These assert behaviour, not just status codes:

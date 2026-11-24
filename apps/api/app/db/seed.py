@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import argparse
 import random
+import re
 import sys
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from sqlalchemy import select
 
@@ -23,6 +25,7 @@ from app.core.rbac import Role
 from app.core.security import hash_password
 from app.db.models import (
     Agent,
+    AgentRun,
     AgentVersion,
     Alert,
     AzureResource,
@@ -34,6 +37,7 @@ from app.db.models import (
     Prompt,
     PromptVersion,
     RagPipeline,
+    UsageRecord,
     User,
 )
 from app.db.seed_content import DEMO_DOCUMENTS, DEMO_EVALUATION_ITEMS
@@ -53,7 +57,7 @@ USERS = [
     ("viewer@contoso.com", "Sam Okafor", Role.VIEWER, "Compliance"),
 ]
 
-MODELS = [
+MODELS: list[dict[str, Any]] = [
     {
         "name": "GPT-4o",
         "deployment_name": "gpt-4o",
@@ -126,7 +130,7 @@ MODELS = [
     },
 ]
 
-AGENTS = [
+AGENTS: list[dict[str, Any]] = [
     {
         "name": "Support Answering Agent",
         "description": "Answers customer support questions from the indexed knowledge base.",
@@ -206,7 +210,7 @@ AGENTS = [
     },
 ]
 
-PROMPTS = [
+PROMPTS: list[dict[str, Any]] = [
     {
         "key": "support.answer",
         "name": "Support answer",
@@ -514,8 +518,6 @@ def seed(reset: bool = False, with_runs: bool = True) -> dict:
                 for index, (template, changelog, environment, approval) in enumerate(
                     spec["versions"], start=1
                 ):
-                    import re
-
                     db.add(
                         PromptVersion(
                             prompt_id=prompt.id,
@@ -635,7 +637,16 @@ def seed(reset: bool = False, with_runs: bool = True) -> dict:
         db.commit()
 
         # ------------------------------------------- real runs + usage
-        if with_runs:
+        # Runs and usage history are append-only, so `_get_or_create` cannot
+        # dedupe them. Only generate them into an empty history; otherwise every
+        # re-seed (e.g. on each container start) would double the cost data.
+        history_exists = (
+            db.execute(select(AgentRun.id).limit(1)).first() is not None
+            or db.execute(select(UsageRecord.id).limit(1)).first() is not None
+        )
+        if with_runs and history_exists:
+            logger.info("seed_history_skipped", extra={"reason": "history already present"})
+        if with_runs and not history_exists:
             questions = [
                 "What is the default chunk size and overlap?",
                 "What availability do we target during business hours?",

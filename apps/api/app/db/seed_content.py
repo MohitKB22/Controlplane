@@ -7,7 +7,9 @@ meaningful — not random — results.
 
 from __future__ import annotations
 
-DEMO_DOCUMENTS: list[dict] = [
+from typing import Any
+
+DEMO_DOCUMENTS: list[dict[str, Any]] = [
     {
         "filename": "contoso-ai-platform-overview.md",
         "tags": ["platform", "architecture"],

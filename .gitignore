@@ -45,3 +45,6 @@ Thumbs.db
 *.tfstate
 *.tfstate.*
 .terraform/
+
+# vite writes these next to the config while it is loading; never commit them
+*.timestamp-*.mjs

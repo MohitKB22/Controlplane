@@ -41,7 +41,7 @@ export function LoginPage() {
     login.error instanceof ApiError
       ? login.error.message
       : login.error
-        ? 'Unable to reach the API. Is it running on port 8000?'
+        ? 'Unable to reach the API. Check that the server is running and try again.'
         : null
 
   return (

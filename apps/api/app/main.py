@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.db import engine
-from app.core.errors import register_exception_handlers
+from app.core.errors import http_error_response, register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import (
     MaxBodySizeMiddleware,
@@ -21,6 +25,9 @@ from app.core.middleware import (
 from app.providers.registry import provider_summary
 
 logger = get_logger(__name__)
+
+# Paths that always belong to the API, never to the single-page app.
+API_PATH_PREFIXES = ("/api/", "/health/", "/assets/", "/docs", "/redoc", "/openapi.json")
 
 DESCRIPTION = """
 Enterprise control plane for AI agents, RAG pipelines, models, prompts,
@@ -71,10 +78,14 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
     )
 
-    # Order matters: the outermost middleware runs first.
-    app.add_middleware(RequestContextMiddleware)
-    app.add_middleware(RateLimitMiddleware)
+    # Order matters. Starlette wraps in reverse: the middleware added LAST is the
+    # outermost and runs first. Resulting request order:
+    #   CORS -> RequestContext -> RateLimit -> MaxBodySize -> routes
+    # so 429/413 short-circuit responses still carry CORS headers, a request ID
+    # and the security headers.
     app.add_middleware(MaxBodySizeMiddleware)
+    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -110,8 +121,13 @@ def create_app() -> FastAPI:
             "providers": provider_summary(),
         }
 
-    @app.get("/", include_in_schema=False)
-    def root() -> dict:
+    web_dist = _web_dist()
+
+    # HEAD as well as GET: uptime monitors commonly probe the root with HEAD.
+    @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False, response_model=None)
+    def root() -> dict | Response:
+        if web_dist is not None:
+            return _spa_index(web_dist)
         return {
             "name": settings.app_name,
             "version": "0.1.0",
@@ -119,7 +135,65 @@ def create_app() -> FastAPI:
             "api": settings.api_v1_prefix,
         }
 
+    if web_dist is not None:
+        _mount_web(app, web_dist)
+
     return app
+
+
+# ------------------------------------------------------------------ web app
+
+
+class _ImmutableStaticFiles(StaticFiles):
+    """Vite emits content-hashed asset names, so they can be cached forever."""
+
+    async def get_response(self, path: str, scope):  # type: ignore[override]
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
+def _web_dist() -> Path | None:
+    if not settings.web_dist_dir:
+        return None
+    dist = Path(settings.web_dist_dir).resolve()
+    if not (dist / "index.html").is_file():
+        logger.error("web_dist_missing", extra={"path": str(dist)})
+        return None
+    return dist
+
+
+def _spa_index(dist: Path) -> FileResponse:
+    # index.html must never be cached, or a deploy would strand clients on
+    # asset hashes that no longer exist.
+    return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})
+
+
+def _mount_web(app: FastAPI, dist: Path) -> None:
+    """Serve the built UI on the API's origin.
+
+    Client-side routes (/agents, /runs/<id>, …) are not known to the server, so
+    a GET that would otherwise 404 outside the API namespace returns index.html
+    and React Router takes over. API paths keep their JSON 404 envelope.
+    """
+    if (dist / "assets").is_dir():
+        app.mount("/assets", _ImmutableStaticFiles(directory=dist / "assets"), name="assets")
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _spa_fallback(request: Request, exc: StarletteHTTPException) -> Response:
+        path = request.url.path
+        if (
+            exc.status_code == 404
+            and request.method in {"GET", "HEAD"}
+            and not path.startswith(API_PATH_PREFIXES)
+        ):
+            # Top-level files in dist (e.g. a favicon) are served as-is.
+            candidate = (dist / path.lstrip("/")).resolve()
+            if candidate.is_file() and dist in candidate.parents:
+                return FileResponse(candidate)
+            return _spa_index(dist)
+        return http_error_response(request, exc)
 
 
 app = create_app()

@@ -37,7 +37,10 @@ INJECTION_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     ),
     (
         "role_hijack",
-        re.compile(r"(?i)^\s*(system|developer)\s*[:>]|(?i)\byou are now\b[^.\n]{0,40}\b(dan|"
+        # Global inline flags must lead the pattern (an error since Python 3.11).
+        # MULTILINE so a forged "system:" line is caught anywhere in the input,
+        # not only on the first line.
+        re.compile(r"(?im)^\s*(system|developer)\s*[:>]|\byou are now\b[^.\n]{0,40}\b(dan|"
                    r"unrestricted|jailbroken|no longer bound)\b"),
         "high",
     ),
@@ -45,7 +48,7 @@ INJECTION_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
         "credential_probe",
         re.compile(r"(?i)\b(api[_ -]?key|connection string|access token|password|secret)\b"
                    r"[^.\n]{0,30}\b(show|print|list|reveal|what is)\b"
-                   r"|(?i)\b(show|print|list|reveal|what is)\b[^.\n]{0,30}"
+                   r"|\b(show|print|list|reveal|what is)\b[^.\n]{0,30}"
                    r"\b(api[_ -]?key|connection string|access token|password|secret)\b"),
         "medium",
     ),

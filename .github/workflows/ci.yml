@@ -38,8 +38,7 @@ jobs:
         run: ruff check .
 
       - name: Type check (mypy)
-        # Non-blocking while annotations are completed; remove the flag to gate on types.
-        run: mypy app --ignore-missing-imports || true
+        run: mypy app --ignore-missing-imports
 
       - name: Verify migrations from an empty database
         env:
@@ -205,9 +204,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Python dependency audit
+        # Audit the resolved environment. The previous form fed pip's JSON
+        # install report to `-r`, which expects a requirements file, so it never
+        # audited anything.
         run: |
           pip install pip-audit
-          pip-audit --strict -r <(pip install -e apps/api --dry-run --report - 2>/dev/null | true) || \
+          pip install -e apps/api
+          pip-audit --skip-editable || \
             echo "pip-audit completed with findings; review the log."
 
       - uses: actions/setup-node@v4

@@ -80,6 +80,17 @@ def _envelope(request: Request, code: str, message: str, details: Any = None) ->
     }
 
 
+def http_error_response(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    code = {401: "unauthenticated", 403: "permission_denied", 404: "not_found"}.get(
+        exc.status_code, "http_error"
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=_envelope(request, code, str(exc.detail)),
+        headers=getattr(exc, "headers", None),
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error(request: Request, exc: AppError) -> JSONResponse:
@@ -90,14 +101,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
-        code = {401: "unauthenticated", 403: "permission_denied", 404: "not_found"}.get(
-            exc.status_code, "http_error"
-        )
-        return JSONResponse(
-            status_code=exc.status_code,
-            content=_envelope(request, code, str(exc.detail)),
-            headers=getattr(exc, "headers", None),
-        )
+        return http_error_response(request, exc)
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

@@ -4,6 +4,54 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — fixes of 2026-11-24
+
+Bug-fix release. Every fix has a regression test in
+`apps/api/tests/test_regressions.py` or the Playwright suite.
+
+### Fixed
+
+- **API failed to import on Python 3.11+.** Two guardrail regexes placed the
+  `(?i)` flag mid-pattern, which is a hard `re.error` since 3.11. This broke
+  every CI job and the Docker image. The role-hijack rule is now also
+  multi-line, so a forged `system:` line is caught anywhere in the input.
+- **API refused to start with the documented configuration.** pydantic-settings
+  JSON-decodes list fields before validators run, so `CORS_ORIGINS=http://…`
+  from `.env.example` (and `docker-compose.yml`) raised `SettingsError`. List
+  settings now accept comma-separated values or a JSON list.
+- **`email-validator` was never declared**, so a clean install failed on import.
+  Now pulled in through `pydantic[email]`.
+- **Re-seeding duplicated history.** Every `python -m app.db.seed` appended
+  another 8 runs and 232 usage records, inflating cost dashboards. Run and
+  usage history are now generated only into an empty database.
+- **Blob-store traversal guard used a string-prefix check**, so a sibling such
+  as `<root>-evil/` passed as inside the store. It now compares path ancestry.
+- **Rate-limited and oversized-body responses lacked a request ID and the
+  security headers** because the middleware order was inverted relative to the
+  comment describing it.
+- **Rate limiter grew without bound**: one deque per client, never pruned.
+  Idle windows are now swept periodically, and hashed static assets are exempt.
+- **CI security scan failed on a test fixture** shaped like an Azure key; the
+  fixture is now assembled at runtime. The `pip-audit` step fed a JSON report
+  to `-r` and never audited anything; it now audits the installed environment.
+- **mypy reported 12 errors** in the seed module (loop variables typed from
+  heterogeneous dict literals). Annotated; the CI type check is now blocking.
+- **Three Playwright specs were wrong** (ambiguous text locators and a node
+  label the UI never renders). The suite was never executed before; all 12
+  journeys now pass against both the dev server and the demo image.
+- Vite's `vite.config.ts.timestamp-*.mjs` temp files were committed; removed
+  and ignored. Added `.dockerignore` files so local `node_modules`, virtualenvs
+  and databases never enter a build context.
+- The sign-in error no longer tells deployed users to check port 8000.
+
+### Added
+
+- Root `Dockerfile`, `scripts/start-demo.sh` and `render.yaml`: a
+  single-container demo image in which the API also serves the built web app
+  (`WEB_DIST_DIR`), with SPA fallback for client-side routes and immutable
+  caching for hashed assets. See `docs/DEPLOYMENT.md` → Hosted demo.
+- `HEAD /` is answered, for uptime monitors.
+
 ## [0.1.0] — 2026-08-16
 
 First working vertical slice. See [BUILD_REPORT.md](BUILD_REPORT.md) for what was

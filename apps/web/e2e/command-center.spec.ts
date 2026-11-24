@@ -80,7 +80,9 @@ test.describe('Azure AI Command Center', () => {
     await expect(page.getByRole('heading', { name })).toBeVisible()
     await page.getByLabel('Test input').fill('What is the default chunk size and overlap?')
     await page.getByRole('button', { name: 'Run agent' }).click()
-    await expect(page.getByText('succeeded')).toBeVisible({ timeout: 30_000 })
+    // "succeeded" also appears in the toast and, once it refreshes, in the
+    // recent-runs table; the run result pill is the first exact match.
+    await expect(page.getByText('succeeded', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
   })
 
   test('runs a RAG query and shows citations', async ({ page }) => {
@@ -88,7 +90,8 @@ test.describe('Azure AI Command Center', () => {
     await page.getByRole('link', { name: 'RAG', exact: true }).click()
     await page.getByLabel('Query').fill('What caused incident 2043?')
     await page.getByRole('button', { name: 'Run query' }).click()
-    await expect(page.getByText(/incident-2043/)).toBeVisible({ timeout: 30_000 })
+    // The answer text and the citation list both name the source document.
+    await expect(page.getByText(/incident-2043/).first()).toBeVisible({ timeout: 30_000 })
   })
 
   test('blocks a prompt injection in the guardrail tester', async ({ page }) => {
@@ -118,7 +121,8 @@ test.describe('Azure AI Command Center', () => {
     await page.locator('tbody tr').first().click()
     await expect(page.getByRole('heading', { name: 'Run inspector' })).toBeVisible()
     await expect(page.getByText('Guardrail Input')).toBeVisible()
-    await expect(page.getByText('Model Generation')).toBeVisible()
+    // Node titles are the graph node IDs, title-cased ("generate" -> "Generate").
+    await expect(page.getByText('Generate', { exact: true })).toBeVisible()
   })
 
   test('runs an evaluation end to end', async ({ page }) => {

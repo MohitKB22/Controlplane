@@ -1,0 +1,24 @@
+# Render blueprint for the hosted demo: one free web service built from the
+# root Dockerfile, serving the API and the web app on the same origin.
+#
+# The demo runs on SQLite inside the container. Render's free instances have an
+# ephemeral filesystem, so the database is re-created and re-seeded whenever
+# the instance restarts — every visitor gets a clean, consistent demo. Set
+# DATABASE_URL to a PostgreSQL connection string to keep data across restarts.
+services:
+  - type: web
+    name: controlplane
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/ready
+    autoDeploy: true
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: dev
+      - key: DEMO_MODE
+        value: "true"

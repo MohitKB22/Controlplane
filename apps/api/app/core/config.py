@@ -6,11 +6,12 @@ local development runs against deterministic in-process providers instead.
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Environment = Literal["local", "dev", "staging", "production"]
 ProviderMode = Literal["local", "azure"]
@@ -37,16 +38,26 @@ class Settings(BaseSettings):
     # Dev-only fallback key. `Settings.validate_production()` rejects it outside local.
     secret_key: str = "dev-insecure-key-change-me"
     access_token_ttl_minutes: int = 60 * 8
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    # NoDecode: these are documented as comma-separated in .env.example. Without
+    # it pydantic-settings JSON-decodes list fields first and refuses to start.
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:5173"]
+    )
     rate_limit_per_minute: int = 240
     max_upload_bytes: int = 20 * 1024 * 1024
-    allowed_upload_extensions: list[str] = Field(
+    allowed_upload_extensions: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: [".pdf", ".txt", ".md", ".csv", ".json", ".docx"]
     )
 
     # ---- storage ----
     database_url: str = "sqlite:///./azure_ai_command_center.db"
     sql_echo: bool = False
+
+    # ---- web ----
+    # Directory holding the built web app (apps/web/dist). When set, the API
+    # also serves the UI from the same origin — used by the single-container
+    # demo image. Leave unset when the UI is hosted separately.
+    web_dist_dir: str | None = None
 
     # ---- provider selection ----
     llm_provider: ProviderMode = "local"
@@ -85,7 +96,10 @@ class Settings(BaseSettings):
     @classmethod
     def _split_csv(cls, value: object) -> object:
         if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
+            stripped = value.strip()
+            if stripped.startswith("["):
+                return json.loads(stripped)
+            return [item.strip() for item in stripped.split(",") if item.strip()]
         return value
 
     @property
@@ -99,7 +113,11 @@ class Settings(BaseSettings):
             return problems
         if self.secret_key == "dev-insecure-key-change-me" or len(self.secret_key) < 32:
             problems.append("SECRET_KEY must be set to a unique value of at least 32 characters.")
-        if self.database_url.startswith("sqlite"):
+        # A public demo (DEMO_MODE on, never production) may run on a throwaway
+        # SQLite file that is re-created and re-seeded on every start. Anything
+        # holding real data must use PostgreSQL.
+        ephemeral_demo = self.demo_mode and self.environment != "production"
+        if self.database_url.startswith("sqlite") and not ephemeral_demo:
             problems.append("DATABASE_URL must point at PostgreSQL outside local development.")
         if self.llm_provider == "azure" and not self.azure_openai_endpoint:
             problems.append("AZURE_OPENAI_ENDPOINT is required when LLM_PROVIDER=azure.")

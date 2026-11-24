@@ -19,8 +19,9 @@ class LocalBlobStore:
 
     def _path(self, key: str) -> Path:
         # Prevent path traversal: the resolved path must stay under root.
+        # A string-prefix check would accept a sibling such as "<root>-evil/...".
         candidate = (self.root / key.lstrip("/")).resolve()
-        if not str(candidate).startswith(str(self.root)):
+        if candidate != self.root and self.root not in candidate.parents:
             raise ProviderError("Invalid storage key.")
         return candidate
 

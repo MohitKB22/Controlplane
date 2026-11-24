@@ -11,6 +11,32 @@ verified.
 
 ---
 
+## Update — 24 November 2026
+
+A follow-up pass found that the build did **not** survive a clean checkout on
+current tooling, despite the results recorded below. On Python 3.11+ the API
+failed to import (an invalid regex), `.env.example`'s own `CORS_ORIGINS` value
+stopped the API starting, and `email-validator` was never declared. GitHub CI
+and the Docker Compose smoke test were red on `main` for exactly these reasons.
+All of it is fixed; see [CHANGELOG.md](CHANGELOG.md) for the full list.
+
+What is now verified, by commands that were run:
+
+| Check | Result |
+|---|---|
+| `pytest` | **126 passed** (102 original + 24 regression tests) |
+| `ruff check .` / `mypy app` | Clean / no issues in 54 files (mypy is now a blocking CI step) |
+| Frontend lint, typecheck, `vitest`, build | Clean; 24 passed |
+| **Playwright E2E** | **12 / 12 passed** — against the dev server, and twice against the single-origin demo build |
+| Demo image start-up path | `start-demo.sh` → migrate → seed → serve, verified in an equivalent local layout; a restart re-seeds without duplicating history |
+| Hosted demo | Deployed to Render from the root `Dockerfile` (see `docs/DEPLOYMENT.md`) |
+
+Still not verified: `docker compose up` and a local `docker build` (no registry
+access in the build environment — the Render build is the first real image
+build), and everything Azure-specific listed in §1.
+
+---
+
 ## 1. Verification status
 
 ### Verified locally — commands were run, output observed
