@@ -10,10 +10,27 @@ switches to Azure OpenAI, Azure AI Search, Blob Storage and Azure Monitor by
 changing environment variables — no code changes.
 
 **Live demo:** [controlplane-03g1.onrender.com](https://controlplane-03g1.onrender.com) —
-sign in with `admin@contoso.com` / `Passw0rd!Demo`. It runs on Render's free tier
-in local provider mode: the first request after an idle period can take up to a
-minute, and the demo data resets whenever the instance restarts
+sign in with any account below. It runs on Render's free tier in local provider
+mode: the first request after an idle period can take up to a minute, and the
+demo data resets whenever the instance restarts
 ([details](docs/DEPLOYMENT.md#hosted-demo-render)).
+
+### Demo accounts
+
+Every account uses the password **`Passw0rd!Demo`**. They exist in the live demo
+and in any local setup after seeding, and each shows a different level of
+role-based access.
+
+| Email | Password | Role | What it can do |
+|---|---|---|---|
+| `admin@contoso.com` | `Passw0rd!Demo` | Admin | Everything, including users and API keys |
+| `engineer@contoso.com` | `Passw0rd!Demo` | AI Engineer | Build, run and delete agents; manage models, prompts, documents, evaluations and guardrails; read audit logs |
+| `dev@contoso.com` | `Passw0rd!Demo` | Developer | Create and run agents and prompts, upload documents, run evaluations |
+| `analyst@contoso.com` | `Passw0rd!Demo` | Analyst | Read everything, run evaluations, read audit logs |
+| `viewer@contoso.com` | `Passw0rd!Demo` | Viewer | Read-only |
+
+These are synthetic demo credentials, seeded only when `DEMO_MODE=true`.
+Production refuses to start with demo mode on.
 
 > **Status.** This is a working vertical slice, not a finished product. Read
 > [BUILD_REPORT.md](BUILD_REPORT.md) for exactly what was verified, what was
@@ -37,9 +54,8 @@ cd azure-ai-command-center
 ./scripts/dev.sh web       # http://localhost:5173
 ```
 
-Sign in with **admin@contoso.com / Passw0rd!Demo**. Four other seeded accounts
-(`engineer@`, `dev@`, `analyst@`, `viewer@contoso.com`) use the same password and
-demonstrate role-based access control.
+Sign in with **admin@contoso.com / Passw0rd!Demo**, or any of the
+[demo accounts](#demo-accounts) above.
 
 ### With Docker
 
