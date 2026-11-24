@@ -23,11 +23,11 @@ role-based access.
 
 | Email | Password | Role | What it can do |
 |---|---|---|---|
-| `admin@contoso.com` | `Passw0rd!Demo` | Admin | Everything, including users and API keys |
+| `admin@contoso.com` | `Passw0rd!Demo` | Admin | Everything, including managing users, issuing API keys and acknowledging or resolving alerts |
 | `engineer@contoso.com` | `Passw0rd!Demo` | AI Engineer | Build, run and delete agents; manage models, prompts, documents, evaluations and guardrails; read audit logs |
 | `dev@contoso.com` | `Passw0rd!Demo` | Developer | Create and run agents and prompts, upload documents, run evaluations |
-| `analyst@contoso.com` | `Passw0rd!Demo` | Analyst | Read everything, run evaluations, read audit logs |
-| `viewer@contoso.com` | `Passw0rd!Demo` | Viewer | Read-only |
+| `analyst@contoso.com` | `Passw0rd!Demo` | Analyst | Read-only access, plus running evaluations and reading audit logs |
+| `viewer@contoso.com` | `Passw0rd!Demo` | Viewer | Read-only (no user list or audit logs) |
 
 These are synthetic demo credentials, seeded only when `DEMO_MODE=true`.
 Production refuses to start with demo mode on.
